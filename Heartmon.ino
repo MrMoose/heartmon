@@ -39,7 +39,11 @@ const unsigned int s_num_pixels = 3;  // number of pixels in strip
 //   NEO_GRB     Pixels are wired for GRB bitstream
 //   NEO_KHZ400  400 KHz bitstream (e.g. FLORA pixels)
 //   NEO_KHZ800  800 KHz bitstream (e.g. High Density LED strip)
-Adafruit_NeoPixel s_strip = Adafruit_NeoPixel(3, 6, NEO_GRB + NEO_KHZ800);
+// Test Neopixel v1
+Adafruit_NeoPixel s_strip = Adafruit_NeoPixel(3, 6, NEO_GRB + NEO_KHZ400);
+
+// Live Neopixel v2:
+//Adafruit_NeoPixel s_strip = Adafruit_NeoPixel(3, 6, NEO_GRB + NEO_KHZ400);
 
 
 // Funtion Declarations
@@ -112,8 +116,12 @@ void loop(void) {
 void loop_demo(void) {
 
 	digitalWrite(s_blinkPin, LOW);    // flatline is flatline	
-	rainbow(20);
-	rainbowCycle(20);
+	if (!rainbow(20)) {
+		return;
+	};
+	if (!rainbowCycle(20)) {
+		return;
+	};
 }
 
 
@@ -148,14 +156,14 @@ void ledFadeToBeat(void) {
 
 void setIntensity(unsigned int n_index, uint8_t n_intensity) {
 
-	uint8_t red = n_intensity; 
-			
-	uint8_t green = 0;
+	uint8_t red   = n_intensity; 
+	uint8_t green = n_intensity / 10;
+	uint8_t blue  = n_intensity / 3;
 
-	//uint8_t blue  = n_intensity / 2
-	uint8_t blue  = n_intensity / 2;
+//	sendColorToSerial("color ", red, green, blue);
 
-	s_strip.setPixelColor(n_index, s_strip.Color(red, green, blue));
+	// Test Pixels have blue and green swapped for some reason
+	s_strip.setPixelColor(n_index, red, blue, green);
 }
 
 
@@ -163,7 +171,7 @@ void adjust_watermarks(void) {
 	
 	// Reset watermarks every time s_watermark_cnt overflows
 /*
-		if (s_alivepulse_age > 500) {
+	if (s_alivepulse_age > 500) {
 		s_low_watermark = 100000;
 		s_high_watermark = 0;
 		Serial.println("MOEP: reset watermarks"); 
@@ -183,7 +191,25 @@ void sendDataToProcessing(char symbol, int data) {
 	Serial.println(data);                  // the data to send culminating in a carriage return
 }
 
+void sendColorToSerial(const char *n_message, const uint8_t n_red, const uint8_t n_green, const uint8_t n_blue) {
 
+	Serial.print(n_message);
+	Serial.print("r: ");
+	Serial.print(n_red);
+	Serial.print(" g: ");
+	Serial.print(n_green);
+	Serial.print(" b: ");
+	Serial.println(n_blue);
+}
+
+
+
+
+/******************************
+   
+  		Neopixels
+
+*******************************/
 
 // Fill the dots one after the other with a color
 void colorWipe(uint32_t c, uint8_t wait) {
@@ -198,13 +224,15 @@ void colorWipe(uint32_t c, uint8_t wait) {
 	}
 }
 
-void rainbow(uint8_t wait) {
+
+// return false when interrupted by pulse
+bool rainbow(uint8_t wait) {
 
 	uint16_t i, j;
 
 	for (j=0; j<256; j++) {
 		if (s_pulse) {
-			return;
+			return false;
 		}
 		for (i=0; i < s_strip.numPixels(); i++) {
 			s_strip.setPixelColor(i, Wheel((i+j) & 255));
@@ -212,16 +240,18 @@ void rainbow(uint8_t wait) {
 		s_strip.show();
 		delay(wait);
 	}
+
+	return true;
 }
 
 // Slightly different, this makes the rainbow equally distributed throughout
-void rainbowCycle(uint8_t wait) {
+bool rainbowCycle(uint8_t wait) {
 	
 	uint16_t i, j;
 
 	for (j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
 		if (s_pulse) {
-			return;
+			return false;
 		}
 		for (i=0; i< s_strip.numPixels(); i++) {
 			s_strip.setPixelColor(i, Wheel(((i * 256 / s_strip.numPixels()) + j) & 255));
@@ -229,6 +259,7 @@ void rainbowCycle(uint8_t wait) {
 		s_strip.show();
 		delay(wait);
 	}
+	return true;
 }
 
 // Input a value 0 to 255 to get a color value.
