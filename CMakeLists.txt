@@ -26,11 +26,14 @@ generate_arduino_library(Adafruit_NeoPixel
 		flora
 )
 
+include_directories(${HeartmonTest_SOURCE_DIR})
 include_directories(AFTER "../Adafruit_NeoPixel/")
 
 generate_arduino_firmware(heartmon
 	SKETCH
 		Heartmon.ino
+	HDRS
+		Macros.h
 	LIBS
 		Adafruit_NeoPixel
 	BOARD
