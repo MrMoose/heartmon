@@ -1,5 +1,6 @@
 #include "Macros.h"
 #include "Adafruit_NeoPixel.h"
+#include "RunningMedian.h"
 
 /******************************
    
@@ -22,9 +23,11 @@ volatile boolean s_pulse = false;   // true when pulse wave is high, false when 
 volatile boolean QS = false;        // becomes true when Arduoino finds a beat.
 bool     s_alive = false;           // switch between running modes. Either with pulse or, if too old, with demo
 
-uint16_t s_low_watermark = 10000;
-uint16_t s_high_watermark = 0;
-uint8_t  s_watermark_cnt = 0;
+// this will track values is used for watermarks
+typedef RunningMedian<int, 50> Median;
+Median   s_median;
+uint8_t  s_sample_cnt = 0;
+
 
 /******************************
    
@@ -80,18 +83,21 @@ void loop(void) {
 
 	if (!s_alive && (abs(Signal - s_last_signal) > 50)) {
 		s_alive = true;
-		s_low_watermark = Signal - 200;
-		s_high_watermark = Signal;
 	//	Serial.println("Yeah! Back from the dead!"); 
+	}
+
+	if (Signal && (s_sample_cnt++ == 5)) {
+		s_median.add(Signal);
+		s_sample_cnt = 0;
 	}
 
 	s_last_signal = Signal;
 
-	sendDataToProcessing('S', Signal);  // send Processing the raw Pulse Sensor data
+//	sendDataToProcessing('S', Signal);  // send Processing the raw Pulse Sensor data
 	if (QS == true) {                    // Quantified Self flag is true when arduino finds a heartbeat
 		s_current_pulse_age = 0;
-		sendDataToProcessing('B', BPM); // send heart rate with a 'B' prefix
-		sendDataToProcessing('Q', IBI); // send time between beats with a 'Q' prefix
+//		sendDataToProcessing('B', BPM); // send heart rate with a 'B' prefix
+//		sendDataToProcessing('Q', IBI); // send time between beats with a 'Q' prefix
 		QS = false;                     // reset the Quantified Self flag for next time
 	} else {
 		// advance but not overflow pulse age
@@ -128,7 +134,7 @@ void loop_demo(void) {
 void loop_pulse(void) {
 
 	// let it flow
-	adjust_watermarks();
+//	adjust_watermarks();
 
 	// set onboard LED to high or low pulse
 	digitalWrite(s_blinkPin, s_pulse ? HIGH : LOW);
@@ -138,14 +144,34 @@ void loop_pulse(void) {
 }
 
 
+void sample(void) {
+
+}
+
 
 void ledFadeToBeat(void) {
 
-	uint8_t constrained_fade = constrain(Signal - s_low_watermark, 0, 255);
-	Serial.print("low wm: ");
-	Serial.print(s_low_watermark);
-	Serial.print(" cf: ");
-	Serial.println(constrained_fade);
+	int lowest  = 0;
+	int highest = 0;
+	int fade    = Signal;
+
+	if (s_median.getMinMax(lowest, highest) == Median::OK) {
+
+		if (highest != lowest) {
+			fade = (Signal - (float)lowest) / ((float)highest - (float)lowest) * 255.0;
+		}
+
+		/*
+		Serial.print("low wm: ");
+		Serial.print(lowest);
+		Serial.print(" high wm: ");
+		Serial.print(highest);
+		Serial.print(" value: ");
+		Serial.println(fade);
+		*/
+	} 
+
+	uint8_t constrained_fade = constrain(fade, 0, 255);
 
 	setIntensity(0, constrained_fade);
 	setIntensity(1, constrained_fade);
@@ -158,31 +184,12 @@ void setIntensity(unsigned int n_index, uint8_t n_intensity) {
 
 	uint8_t red   = n_intensity; 
 	uint8_t green = n_intensity / 10;
-	uint8_t blue  = n_intensity / 3;
+	uint8_t blue  = n_intensity / 4;
 
 //	sendColorToSerial("color ", red, green, blue);
 
 	// Test Pixels have blue and green swapped for some reason
 	s_strip.setPixelColor(n_index, red, blue, green);
-}
-
-
-void adjust_watermarks(void) {
-	
-	// Reset watermarks every time s_watermark_cnt overflows
-/*
-	if (s_alivepulse_age > 500) {
-		s_low_watermark = 100000;
-		s_high_watermark = 0;
-		Serial.println("MOEP: reset watermarks"); 
-	}
-*/
-	if (Signal < s_low_watermark) {
-		s_low_watermark = Signal;
-	}
-	if (Signal > s_high_watermark) {
-		s_high_watermark = Signal;
-	}
 }
 
 void sendDataToProcessing(char symbol, int data) {
