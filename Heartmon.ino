@@ -43,18 +43,17 @@ const unsigned int s_num_pixels = 3;  // number of pixels in strip
 //   NEO_KHZ400  400 KHz bitstream (e.g. FLORA pixels)
 //   NEO_KHZ800  800 KHz bitstream (e.g. High Density LED strip)
 // Test Neopixel v1
-Adafruit_NeoPixel s_strip = Adafruit_NeoPixel(3, 6, NEO_GRB + NEO_KHZ400);
-
-// Live Neopixel v2:
 //Adafruit_NeoPixel s_strip = Adafruit_NeoPixel(3, 6, NEO_GRB + NEO_KHZ400);
 
+// Live Neopixel v2:
+Adafruit_NeoPixel s_strip = Adafruit_NeoPixel(3, 6, NEO_RGB + NEO_KHZ800);
 
 // Funtion Declarations
 void setup(void);
 void loop(void);
 void loop_demo(void);
 void loop_pulse(void);
-void setIntensity(unsigned int n_index, unsigned short n_intensity);
+void setIntensity(unsigned int n_index, uint8_t n_intensity);
 
 // fade external LEDs each beat
 void ledFadeToBeat(void);
@@ -153,32 +152,26 @@ void ledFadeToBeat(void) {
 
 	int lowest  = 0;
 	int highest = 0;
-	int fade    = Signal;
+	int signal  = Signal;
+	int fade    = signal;
 
 	if (s_median.getMinMax(lowest, highest) == Median::OK) {
 
 		if (highest != lowest) {
-			fade = (Signal - (float)lowest) / ((float)highest - (float)lowest) * 255.0;
+	//		fade = (Signal - (float)lowest) / ((float)highest - (float)lowest) * 255.0;
+			// multiply with 100 to avoid float
+			fade = ((((signal - lowest) * 100) / (highest - lowest)) * 255) / 100;
 		}
-
-		/*
-		Serial.print("low wm: ");
-		Serial.print(lowest);
-		Serial.print(" high wm: ");
-		Serial.print(highest);
-		Serial.print(" value: ");
-		Serial.println(fade);
-		*/
 	} 
 
-	uint8_t constrained_fade = constrain(fade, 0, 255);
+	unsigned long int fade_out_percentage = 100;
 
-	setIntensity(0, constrained_fade);
-	setIntensity(1, constrained_fade);
-	setIntensity(2, constrained_fade);
+	for (unsigned int i = 0; i < s_num_pixels; i++) {
+		setIntensity(i, constrain((fade * fade_out_percentage) / 100, 0, 255));
+		fade_out_percentage -= 25;
+	}
 	s_strip.show();
 }
-
 
 void setIntensity(unsigned int n_index, uint8_t n_intensity) {
 
@@ -186,10 +179,11 @@ void setIntensity(unsigned int n_index, uint8_t n_intensity) {
 	uint8_t green = n_intensity / 10;
 	uint8_t blue  = n_intensity / 4;
 
-//	sendColorToSerial("color ", red, green, blue);
+//	sendColorToSerial("color ", n_index, red, green, blue);
 
 	// Test Pixels have blue and green swapped for some reason
-	s_strip.setPixelColor(n_index, red, blue, green);
+//	s_strip.setPixelColor(n_index, red, blue, green);
+	s_strip.setPixelColor(n_index, red, green, blue);
 }
 
 void sendDataToProcessing(char symbol, int data) {
@@ -198,10 +192,12 @@ void sendDataToProcessing(char symbol, int data) {
 	Serial.println(data);                  // the data to send culminating in a carriage return
 }
 
-void sendColorToSerial(const char *n_message, const uint8_t n_red, const uint8_t n_green, const uint8_t n_blue) {
+void sendColorToSerial(const char *n_message, const int n_index, const uint8_t n_red, const uint8_t n_green, const uint8_t n_blue) {
 
 	Serial.print(n_message);
-	Serial.print("r: ");
+	Serial.print(" i: ");
+	Serial.print(n_index);
+	Serial.print(" r: ");
 	Serial.print(n_red);
 	Serial.print(" g: ");
 	Serial.print(n_green);
