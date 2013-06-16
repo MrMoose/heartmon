@@ -2,6 +2,8 @@
 #include "Adafruit_NeoPixel.h"
 #include "RunningMedian.h"
 
+// #define SERIAL_OUT
+
 /******************************
    
   		Pulse Sensor
@@ -46,7 +48,7 @@ const unsigned int s_num_pixels = 3;  // number of pixels in strip
 //Adafruit_NeoPixel s_strip = Adafruit_NeoPixel(3, 6, NEO_GRB + NEO_KHZ400);
 
 // Live Neopixel v2:
-Adafruit_NeoPixel s_strip = Adafruit_NeoPixel(3, 6, NEO_RGB + NEO_KHZ800);
+Adafruit_NeoPixel s_strip = Adafruit_NeoPixel(3, 6, NEO_GRB + NEO_KHZ800);
 
 // Funtion Declarations
 void setup(void);
@@ -71,8 +73,10 @@ void setup(void) {
 	s_strip.show();                   // Initialize all pixels to 'off'
 
 	pinMode(s_blinkPin, OUTPUT);      // on-board LED that will blink to heartbeat
-
+#ifdef SERIAL_OUT
 	Serial.begin((unsigned int)115200); // we agree to talk fast!
+#endif
+	
 	interruptSetup();                 // sets up to read Pulse Sensor signal every 2mS 
 
 	analogReference(EXTERNAL);        // use 3.3V power instead of 5. Important
@@ -82,7 +86,9 @@ void loop(void) {
 
 	if (!s_alive && (abs(Signal - s_last_signal) > 50)) {
 		s_alive = true;
-	//	Serial.println("Yeah! Back from the dead!"); 
+#ifdef SERIAL_OUT
+		Serial.println("Yeah! Back from the dead!"); 
+#endif
 	}
 
 	if (Signal && (s_sample_cnt++ == 5)) {
@@ -105,7 +111,9 @@ void loop(void) {
 		}
 		if (s_current_pulse_age > s_max_pulse_age) {
 			s_alive = false;   // should I be sad?
-		//	Serial.println("You are dead. Sorry.."); 
+#ifdef SERIAL_OUT
+			Serial.println("You are dead. Sorry.."); 
+#endif
 		}
 	}
 
@@ -152,10 +160,15 @@ void ledFadeToBeat(void) {
 
 	int lowest  = 0;
 	int highest = 0;
-	int signal  = Signal;
-	int fade    = signal;
+	uint32_t signal  = Signal;
+	uint32_t fade    = signal;
 
 	if (s_median.getMinMax(lowest, highest) == Median::OK) {
+		if (signal <= lowest) {
+			signal = lowest + 1;
+		} else if (signal > highest) {
+			signal = highest;
+		}
 
 		if (highest != lowest) {
 	//		fade = (Signal - (float)lowest) / ((float)highest - (float)lowest) * 255.0;
@@ -164,7 +177,19 @@ void ledFadeToBeat(void) {
 		}
 	} 
 
-	unsigned long int fade_out_percentage = 100;
+#ifdef SERIAL_OUT
+		Serial.print("S: "); 
+		Serial.print(signal);
+		Serial.print(" low: "); 
+		Serial.print(lowest);
+		Serial.print(" high: "); 
+		Serial.print(highest);
+		Serial.print(" fade: "); 
+		Serial.println(fade);
+
+#endif
+#
+	unsigned int fade_out_percentage = 100;
 
 	for (unsigned int i = 0; i < s_num_pixels; i++) {
 		setIntensity(i, constrain((fade * fade_out_percentage) / 100, 0, 255));
