@@ -2,7 +2,8 @@
 #include "Adafruit_NeoPixel.h"
 #include "RunningMedian.h"
 
-// #define SERIAL_OUT
+// #define SERIAL_OUT     // define this to enable debug logging to Serial
+// #define PROCESSING_OUT // there is a processing client to the sensor.
 
 /******************************
    
@@ -53,14 +54,14 @@ Adafruit_NeoPixel s_strip = Adafruit_NeoPixel(3, 6, NEO_GRB + NEO_KHZ800);
 // Funtion Declarations
 void setup(void);
 void loop(void);
+// When I'm dead, I loop this to have something blink at least
 void loop_demo(void);
+// This loops as long as I think I'm alive
 void loop_pulse(void);
 void setIntensity(unsigned int n_index, uint8_t n_intensity);
 
-// fade external LEDs each beat
+//! fade external LEDs each beat
 void ledFadeToBeat(void);
-
-void adjust_watermarks(void);
 
 //! sets up to read Pulse Sensor signal every 2mS 
 void interruptSetup(void); 
@@ -91,6 +92,9 @@ void loop(void) {
 #endif
 	}
 
+	// Every 5 loops I take the current signal and calculate
+	// a floating median over it to have an approximate watermark
+	// at all times.
 	if (Signal && (s_sample_cnt++ == 5)) {
 		s_median.add(Signal);
 		s_sample_cnt = 0;
@@ -98,11 +102,15 @@ void loop(void) {
 
 	s_last_signal = Signal;
 
-//	sendDataToProcessing('S', Signal);  // send Processing the raw Pulse Sensor data
+#ifdef PROCESSING_OUT
+	sendDataToProcessing('S', Signal);  // send Processing the raw Pulse Sensor data
+#endif
 	if (QS == true) {                    // Quantified Self flag is true when arduino finds a heartbeat
 		s_current_pulse_age = 0;
-//		sendDataToProcessing('B', BPM); // send heart rate with a 'B' prefix
-//		sendDataToProcessing('Q', IBI); // send time between beats with a 'Q' prefix
+#ifdef PROCESSING_OUT
+		sendDataToProcessing('B', BPM); // send heart rate with a 'B' prefix
+		sendDataToProcessing('Q', IBI); // send time between beats with a 'Q' prefix
+#endif
 		QS = false;                     // reset the Quantified Self flag for next time
 	} else {
 		// advance but not overflow pulse age
@@ -126,6 +134,7 @@ void loop(void) {
 	delay(20);                         //  take a break
 }
 
+// When I'm dead, I loop this to have something blink at least
 void loop_demo(void) {
 
 	digitalWrite(s_blinkPin, LOW);    // flatline is flatline	
@@ -137,22 +146,14 @@ void loop_demo(void) {
 	};
 }
 
-
+// This loops as long as I think I'm alive
 void loop_pulse(void) {
-
-	// let it flow
-//	adjust_watermarks();
 
 	// set onboard LED to high or low pulse
 	digitalWrite(s_blinkPin, s_pulse ? HIGH : LOW);
 
 	// use external LEDs
 	ledFadeToBeat();
-}
-
-
-void sample(void) {
-
 }
 
 
