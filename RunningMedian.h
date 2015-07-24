@@ -13,7 +13,7 @@
 
 #include <inttypes.h>
 
-template <typename T, int N>
+template <typename T, unsigned short N>
 class RunningMedian {
 
 public:

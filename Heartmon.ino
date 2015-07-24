@@ -27,7 +27,7 @@ volatile boolean QS = false;        // becomes true when Arduoino finds a beat.
 bool     s_alive = false;           // switch between running modes. Either with pulse or, if too old, with demo
 
 // this will track values is used for watermarks
-typedef RunningMedian<int, 50> Median;
+typedef RunningMedian<int, 255> Median;
 Median   s_median;
 uint8_t  s_sample_cnt = 0;
 
@@ -85,17 +85,21 @@ void setup(void) {
 
 void loop(void) {
 
-	if (!s_alive && (abs(Signal - s_last_signal) > 50)) {
+	cli();
+
+//	if (!s_alive && (abs(Signal - s_last_signal) > 50)) {
+	if (!s_alive && (Signal > 400)) {
 		s_alive = true;
 #ifdef SERIAL_OUT
 		Serial.println("Yeah! Back from the dead!"); 
 #endif
+		s_median.clear();
 	}
 
 	// Every 5 loops I take the current signal and calculate
 	// a floating median over it to have an approximate watermark
 	// at all times.
-	if (Signal && (s_sample_cnt++ == 5)) {
+	if (Signal && (s_sample_cnt++ == 25)) {
 		s_median.add(Signal);
 		s_sample_cnt = 0;
 	}
@@ -130,6 +134,9 @@ void loop(void) {
 	} else {
 		loop_demo();
 	}
+
+
+	sei();
 
 	delay(20);                         //  take a break
 }
@@ -177,7 +184,7 @@ void ledFadeToBeat(void) {
 			fade = ((((signal - lowest) * 100) / (highest - lowest)) * 255) / 100;
 		}
 	} 
-
+/*
 #ifdef SERIAL_OUT
 		Serial.print("S: "); 
 		Serial.print(signal);
@@ -189,6 +196,7 @@ void ledFadeToBeat(void) {
 		Serial.println(fade);
 
 #endif
+*/
 #
 	unsigned int fade_out_percentage = 100;
 
